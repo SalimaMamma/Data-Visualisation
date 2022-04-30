@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+    .line {
+        fill: none;
+        stroke-width: 2px;
+        clip-path: url(#clip);
+    }
+
+    .zoom {
+        cursor: move;
+        fill: none;
+        pointer-events: all;
+    }
+
+
+    .brush .extent {
+        stroke: #fff;
+        fill-opacity: .125;
+        shape-rendering: crispEdges;
+    }
+
+    .line.highlight {
+        fill-opacity: 1;
+        stroke-opacity: 1;
+    }
+
+    .focus .line.highlight {
+        stroke-width: 3;
+    }
+
+    .context .line.highlight {
+        stroke-width: 1.0;
+    }
+
+    .line.fadeout {
+        fill-opacity: 0.2;
+        stroke-opacity: 0.2;
+    }
+</style>
+<div id="options">
+    <label>
+        <input name="radio" type="radio" checked onclick="mouseover('Charbon')" />
+        Charbon
+    </label>
+    <label>
+        <input name="radio" type="radio" onclick="mouseover('Gaz')" />
+        Gaz
+    </label>
+    <label>
+        <input name="radio" type="radio" checked onclick="mouseover('Gaz shiste')" />
+        Gaz shiste
+    </label>
+    <label>
+        <input name="radio" type="radio" onclick="mouseover('Petrole')" />
+        Petrole
+    </label>
+
+</div>
+<svg width="1100" height="500"></svg>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script>
+    //* Création et Initialisation des paramétres du canva
+    var svg = d3.select("svg"),
+        margin = { top: 20, right: 20, bottom: 110, left: 40 },
+        margin2 = { top: 430, right: 20, bottom: 30, left: 40 },
+        width = +svg.attr("width") - margin.left - margin.right,
+        height = +svg.attr("height") - margin.top - margin.bottom,
+        height2 = +svg.attr("height") - margin2.top - margin2.bottom;
+
+
+    var produit;
+
+    //* Creation des axes X et Y
+    var x = d3.scaleTime().range([0, width]),
+        x2 = d3.scaleTime().range([0, width]),
+        y = d3.scaleLinear().range([height, 0]),
+        y2 = d3.scaleLinear().range([height2, 0]);
+
+    var xAxis = d3.axisBottom(x),
+        xAxis2 = d3.axisBottom(x2),
+        yAxis = d3.axisLeft(y);
+
+    var brush = d3.brushX()
+        .extent([[0, 0], [width, height2]])
+        .on("brush end", brushed);
+
+    var zoom = d3.zoom()
+        .scaleExtent([1, Infinity])
+        .translateExtent([[0, 0], [width, height]])
+        .extent([[0, 0], [width, height]])
+        .on("zoom", zoomed);
+
+    //* Création des Lines 
+    var line = d3.line()
+        .x(function (d) { return x(d.Year); })
+        .y(function (d) { return y(d.prix); });
+
+    var line2 = d3.line()
+        .x(function (d) { return x2(d.Year); })
+        .y(function (d) { return y2(d.prix); });
+
+    //Initialisations liées à l'implémentation du focus et context 
+    svg.append("defs").append("clipPath")
+        .attr("id", "clip")
+        .append("rect")
+        .attr("width", width)
+        .attr("height", height);
+
+    var focus = svg.append("g")
+        .attr("class", "focus")
+        .attr("transform", "translate(" + (margin.left + 100) + "," + margin.top + ")");
+
+    var context = svg.append("g")
+        .attr("class", "context")
+        .attr("transform", "translate(" + (margin2.left + 100) + "," + margin2.top + ")");
+
+    // Il s'agit des légendes qui accompagnent les lines chart pour les indexer
+    var legend = svg.append("g")
+        .attr("class", "legend")
+        .attr("transform", "translate(" + (margin2.right) + "," + (margin2.bottom + 20) + ")");
+
+    //* Les couleurs des line chart
+    var color = d3.scaleOrdinal().range(["#9d02d7", "#0abb53", "#d6372c", "#555555",
+
+        , "black", "grey", "darkgreen", "pink", "brown", "slateblue", "grey1", "orange"]);
+    /***********************************************************************************************/
+    //Récupération des données du fichier et dessin des axes et line chart à partir de celles-ci
+    d3.tsv("dataf.tsv", function (error, data) {
+        if (error) throw error;
+
+        color.domain(d3.keys(data[0]).filter(function (key) { return key !== "Year"; }));
+
+
+        var products = color.domain().map(function (name) {
+            return {
+                name: name,
+                values: data.map(function (d) {
+                    return { Year: d.Year, prix: +d[name] };
+                })
+            };
+        });
+        // Récupération des dates pour l'axe x ainsi que les valeurs Y
+        x.domain(d3.extent(data, function (d) { return d.Year; }));
+        y.domain([
+            1.5 * d3.min(products, function (c) { return d3.min(c.values, function (v) { return v.prix; }); }),
+            d3.max(products, function (c) { return d3.max(c.values, function (v) { return v.prix; }); })
+        ]);
+        x2.domain(x.domain());
+        y2.domain(y.domain());
+
+        // Implémentation du focus et du context 
+        focus.append("path")
+            .datum(data)
+            .attr("class", "line")
+            .attr("d", line);
+
+        focus.append("g")
+            .attr("class", "axis axis--x")
+            .attr("transform", "translate(0," + height + ")")
+            .call(xAxis);
+
+        focus.append("g")
+            .attr("class", "axis axis--y")
+            .call(yAxis);
+
+        focus.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 6)
+            .attr("dy", ".71em")
+            .style("text-anchor", "end")
+            .text("Prix");
+
+        context.append("path")
+            .datum(data)
+            .attr("class", "line")
+            .attr("d", line2);
+
+        context.append("g")
+            .attr("class", "axis axis--x")
+            .attr("transform", "translate(0," + height2 + ")")
+            .call(xAxis2);
+
+
+        context.append("g")
+            .attr("class", "brush")
+            .call(brush)
+            .call(brush.move, x.range());
+
+        svg.append("rect")
+            .attr("class", "zoom")
+            .attr("width", width)
+            .attr("height", height)
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+            .call(zoom);
+
+        var city = focus.selectAll(".city")
+            .data(products)
+            .enter().append("g")
+            .attr("class", "city");
+
+        city.append("path")
+            .attr("class", "line")
+            .attr("clip-path", "url(#clip)")
+            .attr("d", function (d) { return line(d.values); })
+            .style("stroke", function (d) { return color(d.name); });
+
+        city.append("text")
+            .datum(function (d) { return { name: d.name, value: d.values[d.values.length - 1] }; })
+            .attr("class", "label")
+            .attr("transform", function (d) { return "translate(" + x(d.value.Year) + "," + y(d.value.prix) + ")"; })
+            .attr("x", 3)
+            .attr("dy", ".35em");
+
+        var city2 = context.selectAll(".city")
+            .data(products)
+            .enter().append("g")
+            .attr("class", "city");
+
+        city2.append("path")
+            .attr("class", "line")
+            .attr("d", function (d) { return line2(d.values); })
+            .style("stroke", function (d) { return color(d.name); });
+
+        /////////////////////////////////////////////////////////////////////////////////////////////
+
+
+        legendItem = legend.selectAll('.city')
+            .data(products.map(function (d) { return d.name; }).sort())
+            .enter().append("g")
+            .attr("transform", function (d, i) { return "translate(0," + i * 18 + ")"; })
+            .attr("class", "city legend")
+
+        legendItem.append("rect")
+            .attr("width", 13)
+            .attr("height", 13)
+            .attr("fill", function (d) { return color(d); });
+
+        legendItem.append("text")
+            .attr("x", 15)
+            .attr("y", 10.5)
+            .text(function (d) { return d; });
+        var mouseG = svg.append("g")
+            .attr("class", "mouse-over-effects")
+            .attr("transform", "translate(" + (margin.left + 100) + "," + margin.top + ")");
+        //Implémentation du highlight des valeurs des lines chart mouseover
+        //La ligne qui suit le cursuer
+        mouseG.append("path")
+            .attr("class", "mouse-line")
+            .style("stroke", "black")
+            .style("stroke-width", "1px")
+            .style("opacity", "0");
+
+        var lines = document.getElementsByClassName('line');
+
+        var mousePerLine = mouseG.selectAll('.mouse-per-line')
+            .data(products)
+            .enter()
+            .append("g")
+            .attr("class", "mouse-per-line");
+        // les cercles qui suivent le curseur et entoure les points du graphes
+        mousePerLine.append("circle")
+            .attr("r", 5)
+            .style("stroke", function (d) {
+                return color(d.name);
+            })
+            .style("fill", "none")
+            .style("stroke-width", "1px")
+            .style("opacity", "0");
+
+        // les textes d'affichage des valeurs 
+        mousePerLine.append("text")
+            .attr("transform", "translate(10,3)");
+
+        //ajouter rect pour attraper les mouvements de la souris
+        mouseG.append('svg:rect') // 
+            .attr('width', width) // 
+            .attr('height', height)
+            .attr('fill', 'none')
+            .attr('pointer-events', 'all')
+            .on('mouseout', mouseout)
+            .on('mouseover', mouseover)
+            .on('mousemove', function () { // mouvement de la souris
+                var mouse = d3.mouse(this);
+
+                d3.selectAll(".mouse-per-line")
+                    .attr("transform", function (d, i) {
+
+                        var xDate = x.invert(mouse[0]),
+                            bisect = d3.bisector(function (d) { return d.Year; }).left;
+                        idx = bisect(d.values, xDate);
+
+                        d3.select(this).select('text')
+                            .text(y.invert(y(d.values[idx].prix)).toFixed(2));
+
+
+                        d3.select(".mouse-line")
+                            .attr("d", function () {
+                                var data = "M" + x(d.values[idx].Year) + "," + height;
+                                data += " " + x(d.values[idx].Year) + "," + 0;
+                                return data;
+                            });
+                        return "translate(" + x(d.values[idx].Year) + "," + y(d.values[idx].prix) + ")";
+                    });
+
+            });
+
+
+
+
+    });
+    /***************************************************************************************************/
+    // Declarations des fonctions utilisées 
+    // Fonctions relatives aux inetractions souris
+    function mouseout() {
+        d3.selectAll('path.line')
+            .classed("highlight", function (d) { return d.name === produit; })
+            .classed("fadeout", function (d) { return d.name !== produit; });
+        d3.select(".mouse-line")
+            .style("opacity", "0");
+        d3.selectAll(".mouse-per-line circle")
+            .style("opacity", "0");
+        d3.selectAll(".mouse-per-line text")
+            .style("opacity", "0");
+    }
+
+    function mouseover(Name) {
+        if (Name === "Petrole" || Name === "Gaz" || Name === "Gaz shiste" || Name === "Charbon") {
+
+            produit = Name;
+        }
+
+
+        d3.selectAll('path.line')
+            .classed("highlight", function (d) { return d.name === produit; })
+            .classed("fadeout", function (d) { return d.name !== produit; });
+
+
+
+        // class lines to highlight and fadeout selected city
+        d3.select(".mouse-line").style("opacity", "0.5");
+        d3.selectAll(".mouse-per-line circle").style("opacity", "1");
+        d3.selectAll(".mouse-per-line text").style("opacity", "1");
+
+
+    }
+    // Fonctions en relations avec le focus et context
+    function brushed() {
+        if (d3.event.sourceEvent && d3.event.sourceEvent.type === "zoom") return; // ignore brush-by-zoom
+        var s = d3.event.selection || x2.range();
+        x.domain(s.map(x2.invert, x2));
+
+        focus.selectAll(".city")
+            .selectAll("path")
+            .attr("d", function (d) { return line(d.values); });
+
+        focus.select(".axis--x").call(xAxis);
+        svg.select(".zoom").call(zoom.transform, d3.zoomIdentity
+            .scale(width / (s[1] - s[0]))
+            .translate(-s[0], 0));
+    }
+
+    function zoomed() {
+        if (d3.event.sourceEvent && d3.event.sourceEvent.type === "brush") return; // ignore zoom-by-brush
+        var t = d3.event.transform;
+        x.domain(t.rescaleX(x2).domain());
+        focus.selectAll(".city")
+            .selectAll("path")
+            .attr("d", function (d) { return line(d.values); });
+        focus.select(".axis--x").call(xAxis);
+        context.select(".brush").call(brush.move, x.range().map(t.invertX, t));
+    }
+
+</script>
