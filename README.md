@@ -8,5 +8,6 @@ Our work respect also Van shneiderman mantras since it provides an overview of t
 Realized with my binome : AIN GUERAD Manel
 
 Screenshots :
-![chart1.png](https://github.com/SalimaMamma/Data-Visualisation/blob/ba363a24f9c8d3255ec79626fde7429e6721d030/chart1.PNG)
+![image5.png](https://github.com/SalimaMamma/Data-Visualisation/blob/aabaf6a4270443ed25041789f4c154a5c4c082ce/image5.png)
+![image2.png](https://github.com/SalimaMamma/Data-Visualisation/blob/aabaf6a4270443ed25041789f4c154a5c4c082ce/image2.png)
 
